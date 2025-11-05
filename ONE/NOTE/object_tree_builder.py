@@ -224,13 +224,11 @@ class RevisionBuilderCtx:
 				self.page_persistent_guid,
 				self.page_level,
 				self.last_modified_by,
-				self.conflict_author,
 				self.page_title,
 				), file=fd)
 		else:
 			print("                                        GUID=%s, Author=%s, title=%s" % (
 				self.page_persistent_guid,
-				self.page_level,
 				self.last_modified_by,
 				self.page_title,
 				), file=fd)

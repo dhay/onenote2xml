@@ -15,6 +15,8 @@
 
 from __future__ import annotations
 import locale
+import sys
+
 from .exception import ArgumentException
 from .STORE.reader import onestore_reader  # For annotations
 
@@ -98,7 +100,7 @@ def MbcsBytesToStr(src:bytes, lcid, charset):
 	#	LCID2Encoding[lcid] = encoding
 	#	locale.setlocale(locale.LC_CTYPE, prev_locale)
 		# Get locale by lcid
-	return str(src, encoding="mbcs")
+	return str(src, encoding="mbcs" if sys.platform == "win32" else "CP1252")
 
 def StringInStorageBuffer(reader:onestore_reader):
 	'''

@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
-
+import sys
 from types import SimpleNamespace
 from ..property_id import *
 from ..STORE.property import Property
@@ -415,8 +415,13 @@ class LayoutAlignmentInParentProperty(LayoutAlignmentProperty):
 			self.min_verbosity = 4
 		return
 
-from win32api import GetUserDefaultLangID
-DefaultLangID = GetUserDefaultLangID()
+if sys.platform == "win32":
+	# Use pywin32 to get the default language ID
+	from win32api import GetUserDefaultLangID
+	DefaultLangID = GetUserDefaultLangID()
+else:
+	DefaultLangID = 0x0409
+
 class LanguageIDObject(IntPropertyObject):
 
 	def __init__(self, _property:Property, **kwargs):
