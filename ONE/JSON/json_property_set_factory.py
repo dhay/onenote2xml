@@ -12,6 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
+import base64
+from mimetypes import guess_type
 
 from ..base_types import *
 from ..property_set_jcid import *
@@ -198,7 +200,19 @@ class jsonEmbeddedFileContainer(jsonPropertySetBase):
     def MakeJsonNode(self, revision_ctx):
         return { 'Filename' : self._filename }
 
-class jsonPictureContainer14(jsonEmbeddedFileContainer): ...
+class jsonPictureContainer14(jsonEmbeddedFileContainer):
+    ...
+
+    def MakeJsonNode(self, revision_ctx):
+        node = super().MakeJsonNode(revision_ctx)
+        filename: str | None = node.get('Filename', None)
+        if filename is not None:
+            node['MimeType'] = guess_type(filename)[0]
+
+        if hasattr(self, '_data') and self._data:
+            node['Data'] = base64.b64encode(self._data).decode('ascii')
+        return node
+
 
 from ..NOTE.property_set_object_factory import PropertySetFactory
 

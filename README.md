@@ -101,12 +101,12 @@ The following verbosity levels are defined:
 
 `0` - only objects and attributes relevant for content and history parsing.
 Rich text objects are converted from separate text run index and style arrays, and the text string,
-to a single array of text run elements. Empty text objects and *outlines* are dropped.  
+to a single array of text run elements. Empty text objects and *outlines* are dropped.
 `1` - only objects and attributes relevant for content and history parsing.
-Rich text objects are left as is.  
-`2` - page layout attributes are included.  
-`3` - some extra author and timestamp attributes included.  
-`4` - all objects and attributes, except for those with undocumented IDs.  
+Rich text objects are left as is.
+`2` - page layout attributes are included.
+`3` - some extra author and timestamp attributes included.
+`4` - all objects and attributes, except for those with undocumented IDs.
 `5` - all objects and attributes, including those with undocumented IDs.
 
 `--output-directory <directory>` (`-R <directory>`)
@@ -137,3 +137,8 @@ By default, in absence of `--all-revisions` option, the most recent revision sna
 `--incremental` (`-i`) option modifies `--output-directory` with `--all-revisions` behavior,
 making it to write only modified files to the version directories.
 Without this option, each version directory contains the full snapshot of the whole OneNote section.
+
+
+## Gotchas
+
+- In order to extract images, you need to go into OneNote settings and choose `General->Sync->Auto Sync Attachments`
