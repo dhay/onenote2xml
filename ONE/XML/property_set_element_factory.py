@@ -179,11 +179,14 @@ class xmlPictureContainer14(xmlEmbeddedFileContainer):
 
     def MakeXmlElement(self, revision_ctx):
         element = super().MakeXmlElement(revision_ctx)
+        mime_type = None
         if hasattr(self, '_filename') and self._filename:
             ET.SubElement(element, 'MimeType').text = guess_type(self._filename)[0]
 
         if hasattr(self, '_data') and self._data:
-            ET.SubElement(element, 'Data').text = base64.b64encode(self._data).decode('ascii')
+            ET.SubElement(
+                element, 'Data', attrib={"Encoding": "base64"}
+            ).text = base64.b64encode(self._data).decode('ascii')
 
         return element
 
