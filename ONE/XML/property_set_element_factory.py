@@ -164,6 +164,14 @@ class xmlEmbeddedFileContainer(PropertySetXmlElementBase):
     def MakeXmlElement(self, revision_ctx):
         element = ET.Element(self._jcid_name)
         ET.SubElement(element, 'Filename').text = self._filename
+        if self._filename is not None:
+            mime_type = guess_type(self._filename)[0]
+            if mime_type:
+                ET.SubElement(element, 'MimeType').text = mime_type
+        if hasattr(self, '_data') and self._data:
+            ET.SubElement(
+                element, 'Data', attrib={"Encoding": "base64"}
+            ).text = base64.b64encode(self._data).decode('ascii')
         return element
 
     def MakeXmlComment(self)->str:
@@ -176,21 +184,7 @@ class xmlEmbeddedFileContainer(PropertySetXmlElementBase):
         return ', '.join(comments)
 
 class xmlPictureContainer14(xmlEmbeddedFileContainer):
-
-    def MakeXmlElement(self, revision_ctx):
-        element = super().MakeXmlElement(revision_ctx)
-        mime_type = None
-        if hasattr(self, '_filename') and self._filename:
-            ET.SubElement(element, 'MimeType').text = guess_type(self._filename)[0]
-
-        if hasattr(self, '_data') and self._data:
-            ET.SubElement(
-                element, 'Data', attrib={"Encoding": "base64"}
-            ).text = base64.b64encode(self._data).decode('ascii')
-
-        return element
-
-
+    ...
 
 from ..NOTE.property_set_object_factory import PropertySetFactory
 

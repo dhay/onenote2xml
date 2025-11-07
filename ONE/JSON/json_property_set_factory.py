@@ -198,21 +198,19 @@ class jsonParagraphStyleObject(jsonPropertySetBase):
 
 class jsonEmbeddedFileContainer(jsonPropertySetBase):
     def MakeJsonNode(self, revision_ctx):
-        return { 'Filename' : self._filename }
-
-class jsonPictureContainer14(jsonEmbeddedFileContainer):
-    ...
-
-    def MakeJsonNode(self, revision_ctx):
-        node = super().MakeJsonNode(revision_ctx)
-        filename: str | None = node.get('Filename', None)
-        if filename is not None:
-            node['MimeType'] = guess_type(filename)[0]
+        node = {'Filename': self._filename}
+        if self._filename is not None:
+            mime_type = guess_type(self._filename)[0]
+            if mime_type:
+                node['MimeType'] = mime_type
 
         if hasattr(self, '_data') and self._data:
             node['Data'] = base64.b64encode(self._data).decode('ascii')
+
         return node
 
+class jsonPictureContainer14(jsonEmbeddedFileContainer):
+    ...
 
 from ..NOTE.property_set_object_factory import PropertySetFactory
 
