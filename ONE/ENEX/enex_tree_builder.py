@@ -188,10 +188,29 @@ class EnexTreeBuilder(ObjectTreeBuilder):
             element_nodes = content_node.get('ElementChildNodes', [])
 
             # Recursively process each element node
-            for element_node in element_nodes:
-                html_parts.extend(self._process_element_node(element_node))
+            html_parts.extend(self._process_element_list(element_nodes))
+            # for element_node in element_nodes:
+            #     html_parts.extend(self._process_element_node(element_node))
 
         return '\n'.join(html_parts) if html_parts else '<div>No content</div>'
+
+    def _process_element_list(self, element_nodes, depth=-1):
+        html_parts = []
+        is_list = False
+        if any(element_node.get('ListNodes') for element_node in element_nodes):
+            is_list = True
+            html_parts.append('<ul>')
+
+        for element_node in element_nodes:
+            child_element = self._process_element_node(element_node, depth=depth + 1)
+            if is_list:
+                html_parts.extend(['<li>'] + child_element + ['</li>'])
+            else:
+                html_parts.extend(child_element)
+
+        if is_list:
+            html_parts.append('</ul>')
+        return html_parts
 
     def _process_element_node(self, node, depth=0):
         """Recursively process an ElementChildNodes element.
@@ -211,7 +230,7 @@ class EnexTreeBuilder(ObjectTreeBuilder):
             return html_parts
 
         # Check if this is a list item (has ListNodes)
-        is_list_item = 'ListNodes' in node and node['ListNodes']
+        # is_list_item = 'ListNodes' in node and node['ListNodes']
 
         # Process ContentChildNodes to extract text and styling
         content_parts = []
@@ -272,17 +291,26 @@ class EnexTreeBuilder(ObjectTreeBuilder):
         # If we have content, wrap it appropriately
         if content_parts:
             content = '\n'.join(content_parts)
-            if is_list_item:
+            # if is_list_item:
                 # Wrap in list item
-                html_parts.append(f'<li>{content}</li>')
-            else:
-                html_parts.append(content)
+                # html_parts.append(f'<li>{content}</li>')
+            # else:
+            html_parts.append(content)
 
         # Recursively process nested ElementChildNodes
         if 'ElementChildNodes' in node:
-            for child_element in node['ElementChildNodes']:
-                html_parts.extend(self._process_element_node(child_element, depth + 1))
+            html_parts.extend(self._process_element_list(node['ElementChildNodes'], depth=depth+1))
+            # children = []
+            # for child_element in node['ElementChildNodes']:
+            #     children.extend(self._process_element_node(child_element, depth + 1))
+            # if all(child.startswith('<li>') for child in children):
+            #     children = ['<ul>'] + children + ['</ul>']
+            # html_parts.extend(children)
 
+
+    # If they're all <li> items, wrap with a <ul>
+        # if all(part.startswith('<li>') for part in html_parts):
+        #     html_parts = ['<ul>'] + html_parts + ['</ul>']
         return html_parts
 
     def _apply_condensed_formatting(self, text, text_obj, content_node):
