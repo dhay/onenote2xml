@@ -111,6 +111,32 @@ class OneNote:
 		json_builder.MakeVersionFiles(directory, options)
 		return
 
+	def GetEnexBuilder(self, options):
+		from ..ENEX.enex_tree_builder import EnexTreeBuilder
+
+		return EnexTreeBuilder(self.onestore,
+							self.GetJsonPropertySetFactory(), options=options)
+
+	def MakeEnexFile(self, filename, options=None):
+		enex_tree = self.MakeEnexTree(options)
+		from xml.etree import ElementTree as ET
+
+		element_tree = ET.ElementTree(enex_tree)
+		ET.indent(element_tree, '  ')
+		with open(filename, 'wb') as file:
+			element_tree.write(file,
+						encoding='utf-8',
+						xml_declaration=True,
+						short_empty_elements=False)
+		return
+
+	def MakeEnexTree(self, options):
+		enex_builder = self.GetEnexBuilder(options)
+		if self.log_file is not None:
+			enex_builder.dump(self.log_file, options.verbose)
+		root = enex_builder.BuildEnexTree(self.ROOT_NODE_NAME, options)
+		return root
+
 	def dump(self, fd, verbose=None):
 		self.onestore.dump(fd, verbose)
 		return
