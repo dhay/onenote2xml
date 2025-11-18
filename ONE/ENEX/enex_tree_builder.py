@@ -14,6 +14,8 @@
 #
 
 from __future__ import annotations
+
+import base64
 from xml.etree import ElementTree as ET
 import datetime
 from ..base_types import *
@@ -474,6 +476,7 @@ class EnexTreeBuilder(ObjectTreeBuilder):
         import hashlib
         data = picture_container.get('Data', '')
         if data:
+            data = base64.b64decode(data)
             hash_obj = hashlib.md5(data.encode() if isinstance(data, str) else data)
             hash_hex = hash_obj.hexdigest()
             return f'<en-media type="image/png" hash="{hash_hex}"/>'
