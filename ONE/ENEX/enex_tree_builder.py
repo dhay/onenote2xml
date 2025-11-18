@@ -468,7 +468,7 @@ class EnexTreeBuilder(ObjectTreeBuilder):
         if isinstance(node, dict):
             # Check for picture container
             if 'PictureContainer' in node:
-                resource_elem = self._create_image_resource(node['PictureContainer'])
+                resource_elem = self._create_image_resource(node['PictureContainer'], node)
                 if resource_elem is not None:
                     resources.append(resource_elem)
 
@@ -487,7 +487,7 @@ class EnexTreeBuilder(ObjectTreeBuilder):
             for item in node:
                 self._find_resources(item, resources)
 
-    def _create_image_resource(self, picture_container):
+    def _create_image_resource(self, picture_container, parent_node):
         """Create a resource element for an image."""
         resource = ET.Element('resource')
 
@@ -505,6 +505,17 @@ class EnexTreeBuilder(ObjectTreeBuilder):
         mime_type = picture_container.get('MimeType', 'image/png')
         mime_elem = ET.SubElement(resource, 'mime')
         mime_elem.text = mime_type
+
+        def to_pixels(size: float) -> int:
+            return int(round(size * 48))  # Not sure where the 48 DPI comes from.
+
+        width = parent_node.get("PictureWidth")
+        height = parent_node.get("PictureHeight")
+        if width and height:
+            width_elem = ET.SubElement(resource, 'width')
+            width_elem.text = str(to_pixels(width))
+            height_elem = ET.SubElement(resource, 'height')
+            height_elem.text = str(to_pixels(height))
 
         # Add filename if available
         filename = picture_container.get('Filename', '')
