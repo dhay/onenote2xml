@@ -162,6 +162,16 @@ class EnexTreeBuilder(ObjectTreeBuilder):
 
         return '\n'.join(enml_parts)
 
+    def _get_text(self, node):
+        if 'RichEditTextUnicode' in node:
+            text = node['RichEditTextUnicode']
+        elif 'TextExtendedAscii' in node:
+            text = node['TextExtendedAscii']
+        else:
+            text = None
+        return text
+
+
     def _extract_content(self, page_data):
         """Extract and format content from page data.
 
@@ -276,8 +286,8 @@ class EnexTreeBuilder(ObjectTreeBuilder):
 
                 # Extract text from RichEditTextUnicode (higher verbosity levels)
                 # Styling is from ParagraphStyle and TextRunFormatting at same level
-                elif 'RichEditTextUnicode' in content_child:
-                    text = content_child['RichEditTextUnicode']
+                elif self._get_text(content_child) is not None:
+                    text = self._get_text(content_child)
                     if text and text.strip():
                         # Apply formatting based on ParagraphStyle and TextRunFormatting
                         formatted_text = self._apply_formatting(text, content_child)
@@ -363,29 +373,42 @@ class EnexTreeBuilder(ObjectTreeBuilder):
         if not text:
             return ''
 
-        # Escape HTML special characters for text content only
-        import html
-        text = html.escape(text)
-
         # Get paragraph style
         para_style = node.get('ParagraphStyle', {})
         text_formatting = node.get('TextRunFormatting', [])
 
+        fmt = {}
+        if text_formatting and len(text_formatting) > 0:
+            fmt = text_formatting[0] if isinstance(text_formatting[0], dict) else {}
+
+        # Escape HTML special characters for text content only
+        import html
+
+        if '\ufddfHYPERLINK' in text:
+            _, link_url, link_text = text.split('"')
+            text = f'<a href="{link_url}">{html.escape(link_text)}</a>'
+        elif fmt.get("Hyperlink", False):
+            text = f'<a href="{text}">{html.escape(text)}</a>'
+        else:
+            text = html.escape(text)
+
+
         # Apply paragraph style (headers, etc.)
         style_id = para_style.get('ParagraphStyleId', '')
 
+        color = fmt.get('FontColor', para_style.get('FontColor'))
+        if color:
+            text = f'<span style="color: {fmt.get('FontColor')};">{text}</span>'
+
         # Apply text formatting first (innermost tags)
-        if text_formatting and len(text_formatting) > 0:
-            fmt = text_formatting[0]
-            if fmt and isinstance(fmt, dict):
-                if fmt.get('Bold'):
-                    text = f'<b>{text}</b>'
-                if fmt.get('Italic'):
-                    text = f'<i>{text}</i>'
-                if fmt.get('Underline'):
-                    text = f'<u>{text}</u>'
-                if fmt.get('Strikethrough'):
-                    text = f'<s>{text}</s>'
+        if fmt.get('Bold', para_style.get('Bold')):
+            text = f'<b>{text}</b>'
+        if fmt.get('Italic', para_style.get('Italic')):
+            text = f'<i>{text}</i>'
+        if fmt.get('Underline', para_style.get('Underline')):
+            text = f'<u>{text}</u>'
+        if fmt.get('Strikethrough', para_style.get('Strikethrough')):
+            text = f'<s>{text}</s>'
 
         # Then apply paragraph-level styles (outermost tags)
         if style_id in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
@@ -431,8 +454,8 @@ class EnexTreeBuilder(ObjectTreeBuilder):
             for elem in cell_node['ElementChildNodes']:
                 if isinstance(elem, dict) and 'ContentChildNodes' in elem:
                     for content in elem['ContentChildNodes']:
-                        if isinstance(content, dict) and 'RichEditTextUnicode' in content:
-                            text = content['RichEditTextUnicode']
+                        if isinstance(content, dict) and self._get_text(content) is not None:
+                            text = self._get_text(content)
                             if text and text.strip():
                                 # Apply formatting but remove outer div wrapper for cells
                                 formatted = self._apply_formatting(text, content)
