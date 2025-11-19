@@ -292,11 +292,12 @@ class EnexTreeBuilder(ObjectTreeBuilder):
                 # Styling is from ParagraphStyle and TextRunFormatting at same level
                 elif self._get_text(content_child) is not None:
                     text = self._get_text(content_child)
-                    if text and text.strip():
-                        # Apply formatting based on ParagraphStyle and TextRunFormatting
-                        formatted_text = self._apply_formatting(text, content_child)
-                        if formatted_text:
-                            content_parts.append(formatted_text)
+                    # Apply formatting based on ParagraphStyle and TextRunFormatting
+                    formatted_text = self._apply_formatting(text.strip(), content_child)
+                    if formatted_text:
+                        content_parts.append(formatted_text)
+                else:
+                    content_parts.append("<p></p>")
 
                 if 'ElementChildNodes' in content_child:
                     for element_child in content_child['ElementChildNodes']:
@@ -457,6 +458,8 @@ class EnexTreeBuilder(ObjectTreeBuilder):
                                 if formatted.startswith('<div>') and formatted.endswith('</div>'):
                                     formatted = formatted[5:-6]
                                 cell_parts.append(formatted)
+                        else:
+                            cell_parts.append("<p></p>")
 
         return ' '.join(cell_parts) if cell_parts else '&nbsp;'
 
