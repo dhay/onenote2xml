@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import base64
+import mimetypes
 from xml.etree import ElementTree as ET
 import datetime
 from ..base_types import *
@@ -260,16 +261,16 @@ class EnexTreeBuilder(ObjectTreeBuilder):
 
                 # Check for images
                 if 'PictureContainer' in content_child:
-                    img_html = self._process_image(content_child['PictureContainer'])
+                    img_html = self._process_media(content_child['PictureContainer'])
                     if img_html:
                         content_parts.append(img_html)
-                    continue
 
                 # Check for embedded files
                 if 'EmbeddedFileContainer' in content_child:
                     file_container = content_child['EmbeddedFileContainer']
-                    filename = file_container.get('Filename', 'attachment')
-                    content_parts.append(f'<div>[Attachment: {filename}]</div>')
+                    filename = content_child.get('EmbeddedFileName', file_container.get('Filename', 'attachment'))
+                    img_html = self._process_media(content_child['EmbeddedFileContainer'], filename)
+                    content_parts.append(f'<div>{img_html}</div><div>[Attachment: {filename}]</div>')
 
                 # Check for condensed JSON format (verbosity 0)
                 # Format: { "type": "paragraph", "content": [{"text": "...", "attr": {...}}], "style": {...} }
@@ -468,10 +469,9 @@ class EnexTreeBuilder(ObjectTreeBuilder):
 
         return ' '.join(cell_parts) if cell_parts else '&nbsp;'
 
-    def _process_image(self, picture_container):
+    def _process_media(self, picture_container, filename = None):
         """Process an image and return placeholder HTML."""
-        # Images will be added as resources, just return a placeholder
-        filename = picture_container.get('Filename', 'image.png')
+        filename = filename or picture_container.get('Filename', 'image.png')
         # Generate hash for the resource
         import hashlib
         data = picture_container.get('Data', '')
@@ -479,7 +479,10 @@ class EnexTreeBuilder(ObjectTreeBuilder):
             data = base64.b64decode(data)
             hash_obj = hashlib.md5(data.encode() if isinstance(data, str) else data)
             hash_hex = hash_obj.hexdigest()
-            return f'<en-media type="image/png" hash="{hash_hex}"/>'
+
+            mime_type, _ = mimetypes.guess_type(filename)
+            mime_type = mime_type or 'application/octet-stream'
+            return f'<en-media type="{mime_type}" hash="{hash_hex}"/>'
 
         return ''
 
@@ -500,7 +503,7 @@ class EnexTreeBuilder(ObjectTreeBuilder):
 
             # Check for embedded file container
             if 'EmbeddedFileContainer' in node:
-                resource_elem = self._create_file_resource(node['EmbeddedFileContainer'])
+                resource_elem = self._create_file_resource(node['EmbeddedFileContainer'], node)
                 if resource_elem is not None:
                     resources.append(resource_elem)
 
@@ -552,7 +555,7 @@ class EnexTreeBuilder(ObjectTreeBuilder):
 
         return resource
 
-    def _create_file_resource(self, file_container):
+    def _create_file_resource(self, file_container, parent_node):
         """Create a resource element for an embedded file."""
         resource = ET.Element('resource')
 
@@ -566,16 +569,22 @@ class EnexTreeBuilder(ObjectTreeBuilder):
         data_elem.set('encoding', 'base64')
         data_elem.text = data
 
-        # Set MIME type
-        mime_type = file_container.get('MimeType', 'application/octet-stream')
-        mime_elem = ET.SubElement(resource, 'mime')
-        mime_elem.text = mime_type
-
         # Add filename
-        filename = file_container.get('Filename', 'attachment')
+        filename = parent_node.get('EmbeddedFileName', file_container.get('Filename', 'attachment'))
         attrs = ET.SubElement(resource, 'resource-attributes')
         filename_elem = ET.SubElement(attrs, 'file-name')
         filename_elem.text = filename
+
+        # Set MIME type
+        mime_type, _ = mimetypes.guess_type(filename)
+        mime_type = file_container.get('MimeType', mime_type or 'application/octet-stream')
+        mime_elem = ET.SubElement(resource, 'mime')
+        mime_elem.text = mime_type
+
+        source_file = parent_node.get("SourceFilepath")
+        if source_file:
+            source_url_elem = ET.SubElement(attrs, 'source-url')
+            source_url_elem.text = f"file://{source_file}"
 
         # Mark as attachment
         attachment_elem = ET.SubElement(attrs, 'attachment')
