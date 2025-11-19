@@ -260,17 +260,18 @@ class EnexTreeBuilder(ObjectTreeBuilder):
                     continue
 
                 # Check for images
-                if 'PictureContainer' in content_child:
-                    img_html = self._process_media(content_child['PictureContainer'])
-                    if img_html:
-                        content_parts.append(img_html)
+                if 'PictureContainer' in content_child or 'EmbeddedFileContainer' in content_child:
+                    if 'PictureContainer' in content_child:
+                        img_html = self._process_media(content_child['PictureContainer'])
+                        if img_html:
+                            content_parts.append(img_html)
 
-                # Check for embedded files
-                if 'EmbeddedFileContainer' in content_child:
-                    file_container = content_child['EmbeddedFileContainer']
-                    filename = content_child.get('EmbeddedFileName', file_container.get('Filename', 'attachment'))
-                    img_html = self._process_media(content_child['EmbeddedFileContainer'], filename)
-                    content_parts.append(f'<div>{img_html}</div><div>[Attachment: {filename}]</div>')
+                    # Check for embedded files
+                    if 'EmbeddedFileContainer' in content_child:
+                        file_container = content_child['EmbeddedFileContainer']
+                        filename = content_child.get('EmbeddedFileName', file_container.get('Filename', 'attachment'))
+                        img_html = self._process_media(content_child['EmbeddedFileContainer'], filename)
+                        content_parts.append(f'<div>{img_html}</div><div>[Attachment: {filename}]</div>')
 
                 # Check for condensed JSON format (verbosity 0)
                 # Format: { "type": "paragraph", "content": [{"text": "...", "attr": {...}}], "style": {...} }
@@ -313,17 +314,7 @@ class EnexTreeBuilder(ObjectTreeBuilder):
         # Recursively process nested ElementChildNodes
         if 'ElementChildNodes' in node:
             html_parts.extend(self._process_element_list(node['ElementChildNodes'], depth=depth+1))
-            # children = []
-            # for child_element in node['ElementChildNodes']:
-            #     children.extend(self._process_element_node(child_element, depth + 1))
-            # if all(child.startswith('<li>') for child in children):
-            #     children = ['<ul>'] + children + ['</ul>']
-            # html_parts.extend(children)
 
-
-    # If they're all <li> items, wrap with a <ul>
-        # if all(part.startswith('<li>') for part in html_parts):
-        #     html_parts = ['<ul>'] + html_parts + ['</ul>']
         return html_parts
 
     def _apply_condensed_formatting(self, text, text_obj, content_node):
@@ -366,7 +357,7 @@ class EnexTreeBuilder(ObjectTreeBuilder):
             return f'<code>{text}</code>'
         else:
             # Wrap in div for paragraph separation
-            return f'<div>{text}</div>'
+            return f'<p>{text}</p>'
 
     def _apply_formatting(self, text, node):
         """Apply formatting to text based on node properties (for higher verbosity levels)."""
@@ -389,9 +380,9 @@ class EnexTreeBuilder(ObjectTreeBuilder):
 
         if '\ufddfHYPERLINK' in text:
             _, link_url, link_text = text.split('"')
-            text = f'<a href="{link_url}">{html.escape(link_text)}</a>'
+            text = f'<a href="{html.escape(link_url)}">{html.escape(link_text)}</a>'
         elif fmt.get("Hyperlink", False):
-            text = f'<a href="{text}">{html.escape(text)}</a>'
+            text = f'<a href="{html.escape(text)}">{html.escape(text)}</a>'
         else:
             text = html.escape(text)
 
@@ -401,7 +392,7 @@ class EnexTreeBuilder(ObjectTreeBuilder):
 
         color = fmt.get('FontColor', para_style.get('FontColor'))
         if color:
-            text = f'<span style="color: {fmt.get('FontColor')};">{text}</span>'
+            text = f'<span style="color: {color};">{text}</span>'
 
         # Apply text formatting first (innermost tags)
         if fmt.get('Bold', para_style.get('Bold')):
@@ -420,7 +411,7 @@ class EnexTreeBuilder(ObjectTreeBuilder):
             return f'<code>{text}</code>'
         else:
             # Wrap in div for paragraph separation
-            return f'<div>{text}</div>'
+            return f'<p>{text}</p>'
 
     def _process_table(self, node):
         """Process a table node."""
