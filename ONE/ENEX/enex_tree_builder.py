@@ -174,6 +174,32 @@ class EnexTreeBuilder(ObjectTreeBuilder):
             text = None
         return text
 
+    def _get_notetag_todo_status(self, node):
+        """Check if node has NoteTag todo checkbox and if it's checked.
+
+        Args:
+            node: The node to check for NoteTagStates
+
+        Returns:
+            tuple: (is_todo, is_checked) where:
+                - is_todo: True if this node has a NoteTagStates property
+                - is_checked: True if the todo is completed (NoteTagCompleted is non-zero)
+        """
+        note_tag_states = node.get('NoteTagStates', [])
+        if not note_tag_states or not isinstance(note_tag_states, list):
+            return (False, False)
+
+        # Check first state entry
+        state = note_tag_states[0] if len(note_tag_states) > 0 else {}
+        if not isinstance(state, dict):
+            return (False, False)
+
+        # Check if NoteTagCompleted exists and is non-zero
+        completed = state.get('NoteTagCompleted', 0)
+        is_checked = completed != 0
+
+        return (True, is_checked)
+
 
     def _extract_content(self, page_data):
         """Extract and format content from page data.
@@ -328,6 +354,9 @@ class EnexTreeBuilder(ObjectTreeBuilder):
         if not text:
             return ''
 
+        # Check for NoteTag todo status
+        is_todo, is_checked = self._get_notetag_todo_status(content_node)
+
         # Escape HTML special characters
         import html
         text = html.escape(text)
@@ -346,6 +375,11 @@ class EnexTreeBuilder(ObjectTreeBuilder):
         if attr.get('strikethrough'):
             text = f'<s>{text}</s>'
 
+        # Prepend todo checkbox if this is a todo item
+        if is_todo:
+            checkbox = f'<en-todo checked="{str(is_checked).lower()}"/> '
+            text = checkbox + text
+
         # Apply paragraph-level styles (outermost tags)
         style_id = style.get('id', 'p')
         if style_id in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
@@ -363,6 +397,9 @@ class EnexTreeBuilder(ObjectTreeBuilder):
 
         if not text:
             return ''
+
+        # Check for NoteTag todo status
+        is_todo, is_checked = self._get_notetag_todo_status(node)
 
         # Get paragraph style
         para_style = node.get('ParagraphStyle', {})
@@ -400,6 +437,11 @@ class EnexTreeBuilder(ObjectTreeBuilder):
             text = f'<u>{text}</u>'
         if fmt.get('Strikethrough', para_style.get('Strikethrough')):
             text = f'<s>{text}</s>'
+
+        # Prepend todo checkbox if this is a todo item
+        if is_todo:
+            checkbox = f'<en-todo checked="{str(is_checked).lower()}"/> '
+            text = checkbox + text
 
         # Then apply paragraph-level styles (outermost tags)
         if style_id in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:

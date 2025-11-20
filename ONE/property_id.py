@@ -175,7 +175,7 @@ class PropertyID(IntEnum):
 	NoteTagCreated                   = 0x1400346E
 	NoteTagCompleted                 = 0x1400346F
 	NoteTagDefinitionOid             = 0x20003488
-	NoteTagStates                    = 0x04003489
+	NoteTagStates                    = 0x40003489
 	ActionItemStatus                 = 0x10003470
 	ActionItemSchemaVersion          = 0x0C003473
 	ReadingOrderRTL                  = 0x08003476
