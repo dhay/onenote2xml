@@ -233,6 +233,30 @@ class EnexTreeBuilder(ObjectTreeBuilder):
 
         return '\n'.join(html_parts) if html_parts else '<div>No content</div>'
 
+    def _convert_unicode_to_html_entities(self, text):
+        """Convert Unicode characters to HTML numeric character references.
+
+        Converts characters with code points >= 0x80 to &#xHHHH; format.
+        This preserves special Unicode characters (including Private Use Area
+        characters like \uf308) as HTML entities in the ENML output.
+
+        Args:
+            text: The text string containing Unicode characters
+
+        Returns:
+            Text with Unicode characters converted to HTML entities
+        """
+        result = []
+        for char in text:
+            code = ord(char)
+            # Convert non-ASCII characters (>= 0x80) to HTML entities
+            # Keep ASCII characters as-is
+            if code >= 0x80:
+                result.append(f'&#x{code:x};')
+            else:
+                result.append(char)
+        return ''.join(result)
+
     def _process_element_list(self, element_nodes, depth=-1):
         html_parts = []
         is_list = False
@@ -361,6 +385,9 @@ class EnexTreeBuilder(ObjectTreeBuilder):
         import html
         text = html.escape(text)
 
+        # Convert Unicode characters to HTML entities
+        text = self._convert_unicode_to_html_entities(text)
+
         # Get formatting attributes
         attr = text_obj.get('attr', {})
         style = content_node.get('style', {})
@@ -414,11 +441,14 @@ class EnexTreeBuilder(ObjectTreeBuilder):
 
         if '\ufddfHYPERLINK' in text:
             _, link_url, link_text = text.split('"')
-            text = f'<a href="{html.escape(link_url)}">{html.escape(link_text)}</a>'
+            link_url = self._convert_unicode_to_html_entities(html.escape(link_url))
+            link_text = self._convert_unicode_to_html_entities(html.escape(link_text))
+            text = f'<a href="{link_url}">{link_text}</a>'
         elif fmt.get("Hyperlink", False):
-            text = f'<a href="{html.escape(text)}">{html.escape(text)}</a>'
+            text = self._convert_unicode_to_html_entities(html.escape(text))
+            text = f'<a href="{text}">{text}</a>'
         else:
-            text = html.escape(text)
+            text = self._convert_unicode_to_html_entities(html.escape(text))
 
 
         # Apply paragraph style (headers, etc.)
