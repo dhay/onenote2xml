@@ -70,7 +70,7 @@ class EnexTreeBuilder(ObjectTreeBuilder):
         # Create options with verbosity 5 to get all attributes including timestamps
         # Verbosity levels: 5 = all objects and attributes
         json_options = SimpleNamespace()
-        json_options.verbosity = 6
+        json_options.verbosity = 4
         # json_options.include_oids = getattr(options, 'include_oids', False)
         # json_options.all_revisions = False
         # json_options.timestamp = None
@@ -104,7 +104,7 @@ class EnexTreeBuilder(ObjectTreeBuilder):
             # to Unix timestamp (seconds since Jan 1, 1970)
             FILETIME_EPOCH_DIFF = 116444736000000000  # 100-nanosecond intervals between 1601 and 1970
             unix_timestamp = (dt - FILETIME_EPOCH_DIFF) / 10000000.0
-            dt = datetime.datetime.utcfromtimestamp(unix_timestamp)
+            dt = datetime.datetime.fromtimestamp(unix_timestamp, tz=datetime.timezone.utc)
         return dt.strftime('%Y%m%dT%H%M%SZ')
 
     def _convert_page_to_note(self, page_data):
@@ -306,10 +306,6 @@ class EnexTreeBuilder(ObjectTreeBuilder):
         # If we have content, wrap it appropriately
         if content_parts:
             content = '\n'.join(content_parts)
-            # if is_list_item:
-                # Wrap in list item
-                # html_parts.append(f'<li>{content}</li>')
-            # else:
             html_parts.append(content)
 
         # Recursively process nested ElementChildNodes
