@@ -3,6 +3,17 @@ py1note package
 
 The package contains Python (3.9+) modules for reading and parsing Microsoft OneNote files (`.one` sections and `.onetoc2` notebooks).
 
+## Gotchas
+
+- In order to extract images and inline attachments, you need to go into OneNote settings and
+  choose `General->Sync->Auto Sync Attachments`
+- Microsoft has different formats for OneNote files. This project does *NOT* know how to parse the files exported
+  from the OneNote web interface. Use the `.one` files stored in the backup directory.
+  * Mac
+    - Go to Settings -> Backups
+    - Select `Back Up Changed Notes Now` or `Back Up All Notebooks Now`.
+    - Click `Open Backup Folder` to identify where the `.one` files are stored.
+
 ## Contents
 
 All OneNote parser code is in [ONE](ONE/README.md) directory and its subdirectories.
@@ -55,7 +66,8 @@ python 1note2json.py <OneNote filename> [common options]
 
 ### `1note2enex.py`{#1note2enex}
 
-[1note2enex.py](1note2enex.py) application converts OneNote files to ENEX (Evernote Export) format, which can be imported into Apple Notes, Evernote, and other compatible note-taking applications.
+[1note2enex.py](1note2enex.py) application converts OneNote files to ENEX (Evernote Export) format, which can be
+imported into Apple Notes, Evernote, and other compatible note-taking applications.
 
 The application is invoked with the following command line:
 
@@ -163,9 +175,3 @@ By default, in absence of `--all-revisions` option, the most recent revision sna
 making it to write only modified files to the version directories.
 Without this option, each version directory contains the full snapshot of the whole OneNote section.
 
-
-## Gotchas
-
-- In order to extract images, you need to go into OneNote settings and choose `General->Sync->Auto Sync Attachments`
-
-Reference: [Test](data:text/plain;base64,X19weWNhY2hlX18KVXBncmFkZUxvZyouaHRtCioudXNlcgp0ZXN0L2RhdGEKdmVudi8KZW52LwoqLm9uZSoK)
