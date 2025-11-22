@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import base64
 import mimetypes
+import re
 from xml.etree import ElementTree as ET
 import datetime
 from ..base_types import *
@@ -440,10 +441,7 @@ class EnexTreeBuilder(ObjectTreeBuilder):
         import html
 
         if '\ufddfHYPERLINK' in text:
-            _, link_url, link_text = text.split('"')
-            link_url = self._convert_unicode_to_html_entities(html.escape(link_url))
-            link_text = self._convert_unicode_to_html_entities(html.escape(link_text))
-            text = f'<a href="{link_url}">{link_text}</a>'
+            text = re.sub(r'\ufddfHYPERLINK "([^"]+)([^\ufddf]+|$)', '<a href="\1">\2</a>', text)
         elif fmt.get("Hyperlink", False):
             text = self._convert_unicode_to_html_entities(html.escape(text))
             text = f'<a href="{text}">{text}</a>'
