@@ -19,9 +19,9 @@ import base64
 import mimetypes
 import re
 from xml.etree import ElementTree as ET
-import datetime
-from ..base_types import *
+
 from ..NOTE.object_tree_builder import *
+
 
 class EnexRevisionTreeBuilderCtx(RevisionBuilderCtx):
     """Context for building a single revision into ENEX format."""
@@ -154,9 +154,11 @@ class EnexTreeBuilder(ObjectTreeBuilder):
     def _build_enml_content(self, page_data):
         """Build ENML content from page data."""
         # ENML content must be wrapped in proper XML structure
-        enml_parts = ['<?xml version="1.0" encoding="UTF-8"?>']
-        enml_parts.append('<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">')
-        enml_parts.append('<en-note>')
+        enml_parts = [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            '<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">',
+            '<en-note>'
+        ]
 
         # Extract content from page
         content_html = self._extract_content(page_data)
@@ -432,31 +434,133 @@ class EnexTreeBuilder(ObjectTreeBuilder):
         # Get paragraph style
         para_style = node.get('ParagraphStyle', {})
         text_formatting = node.get('TextRunFormatting', [])
-
-        fmt = {}
-        if text_formatting and len(text_formatting) > 0:
-            fmt = text_formatting[0] if isinstance(text_formatting[0], dict) else {}
+        text_run_index = node.get('TextRunIndex', [])
 
         # Escape HTML special characters for text content only
         import html
 
-        if '\ufddfHYPERLINK' in text:
-            text = re.sub(r'\ufddfHYPERLINK "([^"]+)([^\ufddf]+|$)', '<a href="\1">\2</a>', text)
-        elif fmt.get("Hyperlink", False):
-            text = self._convert_unicode_to_html_entities(html.escape(text))
-            text = f'<a href="{text}">{text}</a>'
+        # Process text runs if TextRunIndex is present
+        if text_run_index and text_formatting:
+            formatted_text = self._process_text_runs(text, text_run_index, text_formatting, para_style)
         else:
-            text = self._convert_unicode_to_html_entities(html.escape(text))
+            # Legacy single-format handling
+            fmt = {}
+            if text_formatting and len(text_formatting) > 0:
+                fmt = text_formatting[0] if isinstance(text_formatting[0], dict) else {}
 
+            if '\ufddfHYPERLINK' in text:
+                text = re.sub(r'\ufddfHYPERLINK "([^"]+)([^\ufddf]+|$)', '<a href="\1">\2</a>', text)
+            elif fmt.get("Hyperlink", False):
+                text = self._convert_unicode_to_html_entities(html.escape(text))
+                text = f'<a href="{text}">{text}</a>'
+            else:
+                text = self._convert_unicode_to_html_entities(html.escape(text))
 
-        # Apply paragraph style (headers, etc.)
+            formatted_text = self._apply_text_formatting(text, fmt, para_style)
+
+        # Prepend todo checkbox if this is a todo item
+        if is_todo:
+            checkbox = f'<en-todo checked="{str(is_checked).lower()}"/> '
+            formatted_text = checkbox + formatted_text
+
+        # Apply paragraph-level styles (outermost tags)
         style_id = para_style.get('ParagraphStyleId', '')
+        if style_id in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+            return f'<{style_id}>{formatted_text}</{style_id}>'
+        elif style_id == 'code':
+            return f'<code>{formatted_text}</code>'
+        else:
+            # Wrap in div for paragraph separation
+            return f'<p>{formatted_text}</p>'
 
+    def _process_text_runs(self, text, text_run_index, text_formatting, para_style):
+        """Process text with multiple formatting runs.
+
+        Args:
+            text: The full text string
+            text_run_index: Array of indexes where to split the text
+            text_formatting: Array of formatting objects (len(text_run_index) + 1)
+            para_style: Paragraph style to use as fallback
+
+        Returns:
+            Formatted HTML string
+        """
+        import html
+
+        # Split text into runs based on TextRunIndex
+        text_runs = []
+        start_idx = 0
+        for idx in text_run_index:
+            text_runs.append(text[start_idx:idx])
+            start_idx = idx
+        text_runs.append(text[start_idx:])  # Last run
+
+        # Process each text run with its corresponding formatting
+        result_parts = []
+        in_hyperlink = False
+        hyperlink_url = None
+
+        for i, run_text in enumerate(text_runs):
+            if i >= len(text_formatting):
+                # Safety check - shouldn't happen but handle gracefully
+                result_parts.append(self._convert_unicode_to_html_entities(html.escape(run_text)))
+                continue
+
+            fmt = text_formatting[i] if isinstance(text_formatting[i], dict) else {}
+
+            # Check for HYPERLINK marker at start of run
+            if run_text.startswith('\ufddfHYPERLINK '):
+                # Extract URL from quotes
+                match = re.match(r'\ufddfHYPERLINK "([^"]+)"(.*)', run_text)
+                if match:
+                    hyperlink_url = match.group(1)
+                    remaining_text = match.group(2)
+                    in_hyperlink = True
+
+                    # If there's remaining text in this run, it's part of the link
+                    if remaining_text:
+                        escaped_text = self._convert_unicode_to_html_entities(html.escape(remaining_text))
+                        formatted_run = self._apply_text_formatting(escaped_text, fmt, para_style)
+                        result_parts.append(f'<a href="{hyperlink_url}">{formatted_run}')
+                    else:
+                        result_parts.append(f'<a href="{hyperlink_url}">')
+                continue
+
+            # Check if we should close the hyperlink
+            if in_hyperlink and not fmt.get('Hyperlink', False):
+                # Close the hyperlink before processing this run
+                result_parts.append('</a>')
+                in_hyperlink = False
+                hyperlink_url = None
+
+            # Process the text run normally
+            escaped_text = self._convert_unicode_to_html_entities(html.escape(run_text))
+            formatted_run = self._apply_text_formatting(escaped_text, fmt, para_style)
+            result_parts.append(formatted_run)
+
+        # Close hyperlink if still open at end
+        if in_hyperlink:
+            result_parts.append('</a>')
+
+        return ''.join(result_parts)
+
+    def _apply_text_formatting(self, text, fmt, para_style):
+        """Apply text-level formatting (bold, italic, etc.) to text.
+
+        Args:
+            text: HTML-escaped text
+            fmt: Formatting dictionary from TextRunFormatting
+            para_style: Paragraph style to use as fallback
+
+        Returns:
+            Text wrapped in formatting tags
+        """
+        # Apply color if present
         color = fmt.get('FontColor', para_style.get('FontColor'))
         if color:
             text = f'<span style="color: {color};">{text}</span>'
 
-        # Apply text formatting first (innermost tags)
+        # Apply text formatting (innermost to outermost)
         if fmt.get('Bold', para_style.get('Bold')):
             text = f'<b>{text}</b>'
         if fmt.get('Italic', para_style.get('Italic')):
@@ -466,19 +570,7 @@ class EnexTreeBuilder(ObjectTreeBuilder):
         if fmt.get('Strikethrough', para_style.get('Strikethrough')):
             text = f'<s>{text}</s>'
 
-        # Prepend todo checkbox if this is a todo item
-        if is_todo:
-            checkbox = f'<en-todo checked="{str(is_checked).lower()}"/> '
-            text = checkbox + text
-
-        # Then apply paragraph-level styles (outermost tags)
-        if style_id in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
-            return f'<{style_id}>{text}</{style_id}>'
-        elif style_id == 'code':
-            return f'<code>{text}</code>'
-        else:
-            # Wrap in div for paragraph separation
-            return f'<p>{text}</p>'
+        return text
 
     def _process_table(self, node):
         """Process a table node."""
