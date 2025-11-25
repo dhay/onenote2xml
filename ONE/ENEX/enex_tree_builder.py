@@ -177,6 +177,38 @@ class EnexTreeBuilder(ObjectTreeBuilder):
             text = None
         return text
 
+    def _process_media_containers(self, node):
+        """Process media containers (images and attachments) from a node.
+
+        Args:
+            node: The node to check for media containers
+
+        Returns:
+            List of HTML strings for media elements, or empty list if none found
+        """
+        media_parts = []
+
+        # Check for PictureContainer
+        if 'PictureContainer' in node:
+            img_html = self._process_media(node['PictureContainer'])
+            if img_html:
+                media_parts.append(img_html)
+
+        # Check for WebPictureContainer14 (web-based images)
+        if 'WebPictureContainer14' in node:
+            img_html = self._process_media(node['WebPictureContainer14'])
+            if img_html:
+                media_parts.append(img_html)
+
+        # Check for embedded files
+        if 'EmbeddedFileContainer' in node:
+            file_container = node['EmbeddedFileContainer']
+            filename = node.get('EmbeddedFileName', file_container.get('Filename', 'attachment'))
+            img_html = self._process_media(node['EmbeddedFileContainer'], filename)
+            media_parts.append(f'<div>{img_html}</div><div>[Attachment: {filename}]</div>')
+
+        return media_parts
+
     def _get_notetag_todo_status(self, node):
         """Check if node has NoteTag todo checkbox and if it's checked.
 
@@ -285,6 +317,7 @@ class EnexTreeBuilder(ObjectTreeBuilder):
         - ListNodes: indicates this is a list item
         - ContentChildNodes: contains RichEditTextUnicode with text and styling
         - ElementChildNodes: nested elements (for nested lists, etc.)
+        - Media containers: PictureContainer, WebPictureContainer14, EmbeddedFileContainer
         """
         html_parts = []
 
@@ -294,6 +327,15 @@ class EnexTreeBuilder(ObjectTreeBuilder):
         # Skip title elements (these are handled separately)
         if node.get('IsTitleText') or node.get('IsTitleDate') or node.get('IsTitleTime'):
             return html_parts
+
+        # Check for media containers at the node level (before ContentChildNodes)
+        # This handles cases where images/attachments are direct children of ElementChildNodes
+        media_parts = self._process_media_containers(node)
+        if media_parts:
+            html_parts.extend(media_parts)
+            # If this node is just a media container, we're done
+            if 'ContentChildNodes' not in node and 'ElementChildNodes' not in node:
+                return html_parts
 
         # Check if this is a list item (has ListNodes)
         # is_list_item = 'ListNodes' in node and node['ListNodes']
@@ -312,23 +354,14 @@ class EnexTreeBuilder(ObjectTreeBuilder):
                         content_parts.append(table_html)
                     continue
 
-                # Check for images
-                if 'PictureContainer' in content_child or 'EmbeddedFileContainer' in content_child:
-                    if 'PictureContainer' in content_child:
-                        img_html = self._process_media(content_child['PictureContainer'])
-                        if img_html:
-                            content_parts.append(img_html)
-
-                    # Check for embedded files
-                    if 'EmbeddedFileContainer' in content_child:
-                        file_container = content_child['EmbeddedFileContainer']
-                        filename = content_child.get('EmbeddedFileName', file_container.get('Filename', 'attachment'))
-                        img_html = self._process_media(content_child['EmbeddedFileContainer'], filename)
-                        content_parts.append(f'<div>{img_html}</div><div>[Attachment: {filename}]</div>')
+                # Check for media containers (images and attachments)
+                media_child_parts = self._process_media_containers(content_child)
+                if media_child_parts:
+                    content_parts.extend(media_child_parts)
 
                 # Check for condensed JSON format (verbosity 0)
                 # Format: { "type": "paragraph", "content": [{"text": "...", "attr": {...}}], "style": {...} }
-                elif 'type' in content_child and 'content' in content_child:
+                if 'type' in content_child and 'content' in content_child:
                     # Extract text from content array
                     content_array = content_child.get('content', [])
                     if isinstance(content_array, list):
@@ -650,6 +683,12 @@ class EnexTreeBuilder(ObjectTreeBuilder):
             # Check for picture container
             if 'PictureContainer' in node:
                 resource_elem = self._create_image_resource(node['PictureContainer'], node)
+                if resource_elem is not None:
+                    resources.append(resource_elem)
+
+            # Check for WebPictureContainer14 (web-based images)
+            if 'WebPictureContainer14' in node:
+                resource_elem = self._create_image_resource(node['WebPictureContainer14'], node)
                 if resource_elem is not None:
                     resources.append(resource_elem)
 
